@@ -1,5 +1,5 @@
 import numpy as np
-from dataclasses import InitVar, dataclass, field
+from dataclasses import dataclass, field
 from matrix_operation import MatrixOperation
 from typing import ClassVar
 

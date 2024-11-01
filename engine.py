@@ -1,27 +1,27 @@
-from dataclasses import InitVar, dataclass, field
+from dataclasses import dataclass, field
 from gameobjects import *
-import numpy     as np
-import pygame    as pg
+from math import tan, radians
+import numpy as np
+import pygame as pg
 
 @dataclass
 class Engine:
+    fov: float = radians(75)
     background_color: tuple[int, int, int] = (40, 40, 40)
-
-    screen_size: InitVar[tuple[int, int]] = (640, 360) # 16:9
-
+    screen_size: tuple[int, int] = (640, 360) # 16:9
     camera: Camera = Camera.instances[0] if Camera.instances else Camera()
-
-    projection_matrix: np.array = np.array([
-        [1, 0, 0, 0],
-        [0, 1, 0, 0],
-        [0, 0, 1, 0], 
-        [0, 0, 1, 0]
-    ])
+    near_clip: float = 0.1
+    far_clip: float = 1000
 
     _window: pg.Surface = field(init=False)
 
-    def __post_init__(self, screen_size):
-        self.SCREEN_SIZE = screen_size
+    def __post_init__(self):
+        self._projection_matrix: np.array = np.array([
+            [1/(self.aspect_ratio * tan(self.fov/2)), 0, 0, 0],
+            [0, 1/tan(self.fov/2), 0, 0],
+            [0, 0, (self.near_clip + self.far_clip) / (self.near_clip - self.far_clip), 2 * self.far_clip * self.near_clip / (self.near_clip - self.far_clip)], 
+            [0, 0, 1, 0]
+        ])
 
         self._init_window()
 
@@ -45,14 +45,15 @@ class Engine:
 
             pg.display.update()
         
-        
         pg.quit()
-        
 
     def _init_window(self):
-        self._window = pg.display.set_mode(self.SCREEN_SIZE)
+        self._window = pg.display.set_mode(self.screen_size)
         pg.display.set_caption(self.__class__.__name__)
         
+    @property
+    def aspect_ratio(self): 
+        return self.screen_size[0] / self.screen_size[1]
 
     def _render(self):
         # Fjern alt fra skjermen
@@ -62,7 +63,7 @@ class Engine:
             vertices = mesh.vertices.copy()
             
             # Regn ut MVP matrise (model, view, projection)
-            MVPmatrix = np.dot(self.projection_matrix, 
+            MVPmatrix = np.dot(self._projection_matrix, 
                             np.dot(np.linalg.inv(self.camera.transformation_matrix),
                                 mesh.transformation_matrix))
 
@@ -81,12 +82,12 @@ class Engine:
                 vertex[0] += 1
                 vertex[1] += 1
                 
-                vertex[0] *= 0.5 * self.SCREEN_SIZE[0]
-                vertex[1] *= 0.5 * self.SCREEN_SIZE[1]
+                vertex[0] *= 0.5 * self.screen_size[0]
+                vertex[1] *= 0.5 * self.screen_size[1]
 
                 # Fordi pygame er lame
                 vertex[1] *= -1
-                vertex[1] += self.SCREEN_SIZE[1]
+                vertex[1] += self.screen_size[1]
 
                 # Lagre før rendering
                 vertices[idx] = vertex[:2]
@@ -95,4 +96,4 @@ class Engine:
             for tri_idx in np.reshape(mesh.indeces, (-1, 3)):
                 tri = [vertices[idx] for idx in tri_idx]
 
-                pg.draw.polygon(self._window, (0, 200, 0), tri, 1)
+                pg.draw.polygon(self._window, (255, 255, 255), tri, 1)
